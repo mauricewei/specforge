@@ -11,7 +11,7 @@ Client library (cinderclient python module) and command line utility \
 
 Name:             python-cinderclient
 Version:          4.0.2
-Release:          1%{?dist}
+Release:          1wocloud%{?dist}
 Summary:          Python API and CLI for OpenStack Cinder
 
 License:          ASL 2.0
