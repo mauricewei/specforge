@@ -5,7 +5,7 @@
 Name:             miner
 Epoch:		  1
 Version:          1.0.1
-Release:          4wocloud%{?dist}
+Release:          5wocloud%{?dist}
 Summary:          OpenStack Resource Management System(%{project})
 
 License:          ASL 2.0
