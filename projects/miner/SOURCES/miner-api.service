@@ -1,0 +1,11 @@
+[Unit]
+Description=Miner API Server
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/miner-api --config-dir /etc/miner/ --logfile /var/log/miner/api.log
+
+[Install]
+WantedBy=multi-user.target
+

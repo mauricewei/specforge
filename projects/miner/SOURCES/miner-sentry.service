@@ -1,0 +1,11 @@
+[Unit]
+Description=Miner Sentry Server
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/miner-sentry --config-dir /etc/miner/ --logfile /var/log/miner/sentry.log
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,7 @@
+/var/log/miner/*.log {
+    rotate 1000
+    size 100M
+    missingok
+    compress
+    delaycompress
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Miner Patrol Server
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/miner-patrol --config-dir /etc/miner/ --logfile /var/log/miner/patrol.log
+
+[Install]
+WantedBy=multi-user.target
+

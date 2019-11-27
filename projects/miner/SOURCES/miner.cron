@@ -1,0 +1,3 @@
+# archive the miner jobs data
+
+* * 1 * * root miner-manage db archive
