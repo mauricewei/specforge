@@ -1,0 +1,33 @@
+Metadata-Version: 1.4
+Name: cinder
+Version: 1.0.1
+Summary: OpenStack Resource Management System
+Home-page: http://www.chinacloud.com.cn/
+Author: Wocloud
+Author-email: project@chinaunicom.cn
+License: UNKNOWN
+Description: ======
+        Miner (Resource Management System)
+        ======
+
+        Manage Open Stack Resource System
+
+        Components
+        ---------------
+
+        * API Service - RESTful API
+        * Sentry Service - Listen Request Message
+
+        * Patrol Service - Listen Open Stack's Notification
+        * Beat Service - Periodic Task
+
+
+Platform: UNKNOWN
+Classifier: Environment :: OpenStack
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
