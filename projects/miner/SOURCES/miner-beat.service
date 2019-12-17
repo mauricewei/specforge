@@ -4,7 +4,7 @@ Description=Miner Beat Server
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/miner-beat --config-dir /etc/miner/ --logfile /var/log/miner/beat.log
+ExecStart=/usr/bin/miner-beat --logfile /var/log/miner/beat.log
 
 [Install]
 WantedBy=multi-user.target
