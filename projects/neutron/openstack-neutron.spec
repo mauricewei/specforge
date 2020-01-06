@@ -17,7 +17,7 @@ Neutron API supports extensions to provide advanced network \
 capabilities (e.g., QoS, ACLs, network monitoring, etc.)
 
 Name:           openstack-%{service}
-Version:        13.0.5
+Version:        13.0.6
 Release:        1wocloud%{?dist}
 Epoch:          1
 Summary:        OpenStack Networking Service
