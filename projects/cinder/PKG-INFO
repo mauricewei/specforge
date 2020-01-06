@@ -1,27 +1,50 @@
-Metadata-Version: 1.4
+Metadata-Version: 1.1
 Name: cinder
-Version: 1.0.1
-Summary: OpenStack Resource Management System
-Home-page: http://www.chinacloud.com.cn/
-Author: Wocloud
-Author-email: project@chinaunicom.cn
+Version: 13.0.6.dev29
+Summary: OpenStack Block Storage
+Home-page: https://docs.openstack.org/cinder/latest/
+Author: OpenStack
+Author-email: openstack-dev@lists.openstack.org
 License: UNKNOWN
-Description: ======
-        Miner (Resource Management System)
+Description-Content-Type: UNKNOWN
+Description: ========================
+        Team and repository tags
+        ========================
+        
+        .. image:: https://governance.openstack.org/tc/badges/cinder.svg
+            :target: https://governance.openstack.org/tc/reference/tags/index.html
+        
+        .. Change things from this point on
+        
         ======
-
-        Manage Open Stack Resource System
-
-        Components
+        CINDER
+        ======
+        
+        You have come across a storage service for an open cloud computing service.
+        It has identified itself as `Cinder`. It was abstracted from the Nova project.
+        
+        * Wiki: https://wiki.openstack.org/Cinder
+        * Developer docs: https://docs.openstack.org/cinder/latest/
+        * Blueprints: https://blueprints.launchpad.net/cinder
+        * Release notes: https://docs.openstack.org/releasenotes/cinder/
+        
+        Getting Started
         ---------------
-
-        * API Service - RESTful API
-        * Sentry Service - Listen Request Message
-
-        * Patrol Service - Listen Open Stack's Notification
-        * Beat Service - Periodic Task
-
-
+        
+        If you'd like to run from the master branch, you can clone the git repo:
+        
+            git clone https://git.openstack.org/openstack/cinder.git
+        
+        For developer information please see
+        `HACKING.rst <https://git.openstack.org/cgit/openstack/cinder/plain/HACKING.rst>`_
+        
+        You can raise bugs here https://bugs.launchpad.net/cinder
+        
+        Python client
+        -------------
+        https://git.openstack.org/cgit/openstack/python-cinderclient
+        
+        
 Platform: UNKNOWN
 Classifier: Environment :: OpenStack
 Classifier: Intended Audience :: Information Technology
@@ -31,3 +54,5 @@ Classifier: Operating System :: POSIX :: Linux
 Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 2
 Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.5
