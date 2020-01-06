@@ -58,3 +58,9 @@ python2-novaclient
 python2-swiftclient
 python-rtslib
 python2-sphinx-feature-classification
+# Neutron depences
+python2-neutron-lib
+python2-os-xenapi
+python2-ovsdbapp
+python2-pecan
+python2-weakrefmethod
