@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: python-neutronclient
-Version: 6.15.0.dev12
+Version: 6.9.1
 Summary: CLI and Client Library for OpenStack Networking
 Home-page: https://docs.openstack.org/python-neutronclient/latest/
 Author: OpenStack Networking Project
