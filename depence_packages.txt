@@ -64,3 +64,5 @@ python2-os-xenapi
 python2-ovsdbapp
 python2-pecan
 python2-weakrefmethod
+# python-neutronclient requires
+python2-osc-lib-tests
