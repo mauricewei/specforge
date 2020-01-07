@@ -12,7 +12,7 @@ Neutron's API.
 
 Name:       python-neutronclient
 Version:    6.9.1
-Release:    2wocloud%{?dist}
+Release:    3wocloud%{?dist}
 Summary:    Python API and CLI for OpenStack Neutron
 
 License:    ASL 2.0
