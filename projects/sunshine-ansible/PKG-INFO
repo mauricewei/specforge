@@ -1,0 +1,870 @@
+Metadata-Version: 1.1
+Name: sunshine-ansible
+Version: 2.2.10
+Summary: Ansible Deployment of Sunshine
+Home-page: https://docs.openstack.org/sunshine-ansible/latest/
+Author: OpenStack
+Author-email: weim6@chinaunicom.cn
+License: Apache License, Version 2.0
+Description-Content-Type: UNKNOWN
+Description: Sunshine-ansible 说明
+        =====================
+        
+        sunshine-ansible用于部署沃云Rocky版本底层高可用服务,包括沃云在用所有openstack组件和miner服务
+        
+          *  本文档将第一台控制节点作为部署节点，可以根据实际情况选取其他节点作为部署节点
+        
+        Project Author:  魏萌 <weim6@chinaunicom.cn>
+        
+        部署步骤
+        ========
+        
+        ## 1. 部署前需要确认的信息
+        
+          - 两个VIP（虚拟IP）地址，一个控制节点用，一个cell节点用。可在实施方案表格里找到
+          - 业务网vlan范围，可在实施方案表格里找到
+          - 一台ceph_monitor主机ip地址，后面会用到这个IP地址
+          - 如果使用定制后的iso镜像，操作系统内核版本号应该是3.10.0-1062.4.3.el7.x86_64（uname -r 查询）
+          - 装操作系统时，需将selinux设置为disable
+          - 装操作系统时，将/etc/ssh/sshd_config配置文件内的UseDNS设置为no
+          - 操作系统语言应设置为英文
+          - 线上环境openstack涉及服务器数量最少需要6台：3台控制cell融合节点，3台计算节点
+          - 部署之前请确保所有计算节点/etc/hosts文件内没有对计算主机的解析，例如：如果有ecm00x的解析都需要将该条解析删除(目前已知的是在计算和ceph融合部署时会有这种情况)
+          - 系统镜像必须为svn上centos7.7最小化安装iso，或者部署组提供的已经验证过的镜像
+        
+        ## 2. ceph pool与认证创建
+        
+        **注：这步创建的ceph pool 名称与ceph user 名称请按照文档给的命令行创建，不要更改,否则后续部署出现问题**
+        
+        **在任意一台ceph monitor节点执行:**
+        ### 2.1 创建pool:
+        
+        ```shell
+        ceph osd pool create volumes 2048
+        ceph osd pool create images 2048
+        ```
+        
+        ### 2.2 初始化pool
+        
+        ```shell
+        rbd pool init volumes
+        rbd pool init images
+        ```
+        
+        ### 2.3 创建用户认证
+        
+        ```shell
+        ceph auth get-or-create client.glance mon 'profile rbd' osd 'profile rbd pool=images' mgr 'profile rbd pool=images'
+        ceph auth get-or-create client.cinder mon 'profile rbd' osd 'profile rbd pool=volumes, profile rbd pool=images' mgr 'profile rbd pool=volumes'
+        ```
+        
+        ## 3. 配置lvm
+        
+        **根据物理机磁盘配置与闲置情况，为mysql数据目录挂载额外的磁盘空间。示例如下（根据实际情况做配置）：**
+        
+        ### 3.1 SSD磁盘初始化
+        
+        ```
+        fdisk -l
+        Disk /dev/sdd: 479.6 GB, 479559942144 bytes, 936640512 sectors
+        Units = sectors of 1 * 512 = 512 bytes
+        Sector size (logical/physical): 512 bytes / 4096 bytes
+        I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+        Disk label type: dos
+        Disk identifier: 0x000ed242
+        创建分区
+        parted /dev/sdd
+        mkparted 0 -1
+        创建pv
+        partprobe /dev/sdd1
+        pvcreate /dev/sdd1
+        创建、激活vg
+        vgcreate vg_mariadb /dev/sdd1
+        vgchange -ay vg_mariadb
+        查看vg容量
+        vgdisplay
+        --- Volume group ---
+        VG Name vg_mariadb
+        System ID
+        Format lvm2
+        Metadata Areas 1
+        Metadata Sequence No 2
+        VG Access read/write
+        VG Status resizable
+        MAX LV 0
+        Cur LV 1
+        Open LV 1
+        Max PV 0
+        Cur PV 1
+        Act PV 1
+        VG Size 446.62 GiB
+        PE Size 4.00 MiB
+        Total PE 114335
+        Alloc PE / Size 114176 / 446.00 GiB
+        Free PE / Size 159 / 636.00 MiB
+        VG UUID bVUmDc-VkMu-Vi43-mg27-TEkG-oQfK-TvqdEc
+        创建lv
+        lvcreate -L 446G -n lv_mariadb vg_mariadb
+        格式化磁盘并获取卷的UUID
+        mkfs.ext4 /dev/mapper/vg_mariadb-lv_mariadb
+        blkid /dev/mapper/vg_mariadb-lv_mariadb
+        /dev/mapper/vg_mariadb-lv_mariadb: UUID="98d513eb-5f64-4aa5-810e-dc7143884fa2" TYPE="ext4"
+        注：98d513eb-5f64-4aa5-810e-dc7143884fa2为卷的UUID
+        挂载磁盘
+        mount /dev/mapper/vg_mariadb-lv_mariadb /var/lib/mysql
+        chown mysql.mysql /var/lib/mysql
+        ```
+        
+        ### 3.2 将硬盘添加至开机挂载**
+        
+        */etc/fstab*
+        
+        ```shell
+        /dev/mapper/wocloud_vg-lv_root / xfs defaults 0 0
+        UUID=ef240bfd-a682-4cc9-9785-d94177d894d9 /boot xfs defaults 0 0
+        /dev/mapper/wocloud_vg-lv_swap swap wap defaults 0 0
+        UUID=98d513eb-5f64-4aa5-810e-dc7143884fa2 /var/lib/mysql ext4 defaults 0 0
+        ```
+        
+        ## 4. 部署yum源
+        
+        **在部署节点执行：**
+        
+        ### 4.1 同步rpm包
+        
+        将内部yum源内的production仓库整体传到线上环境的/opt/repo目录下
+        
+        ```shell
+        mkdir /opt/repo
+        scp production root@xx.xx.xx.xx:/opt/repo/
+        ```
+        
+        ### 4.2 创建yum源
+        
+        生成仓库索引
+        
+        ```shell
+        cd /opt/repo/production/centos/noarch/7/centos-openstack-rocky/
+        createrepo ./
+        ```
+        
+        创建simplehttp服务,用于提供yum仓库包的访问
+        
+        ```shell
+        cd /opt/repo/
+        python -m SimpleHTTPServer 38888 > /dev/null 2>&1  &
+        # 清除防火墙规则
+        iptable -F
+        ```
+        
+        ## 5. 配置yum repo
+        
+        **在部署节点执行：**
+        
+        ### 5.1 备份yum源
+        
+        ```shell
+        mkdir /etc/yum.repos.d/bak/
+        mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/bak/
+        ```
+        
+        ### 5.2 创建wocloud yum repo
+        
+        ```shell
+        # x86_64架构服务器的yum源rep文件
+        cat > /etc/yum.repos.d/wocloud.repo << EOF
+        [base-production]
+        name=Wocloud Base
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/x86_64/7/base
+        gpgcheck=0
+        enabled=1
+        
+        [updates-production]
+        name=Wocloud updates
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/x86_64/7/updates
+        gpgcheck=0
+        enabled=1
+        
+        [extras-production]
+        name=Wocloud extras
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/x86_64/7/extras
+        gpgcheck=0
+        enabled=1
+        
+        [centos-openstack-rocky-production]
+        name=Wocloud centos-openstack-rocky
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/noarch/7/centos-openstack-rocky
+        gpgcheck=0
+        enabled=1
+        
+        [centos-qemu-ev-production]
+        name=Wocloud centos-qemu-ev
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/x86_64/7/centos-qemu-ev
+        gpgcheck=0
+        enabled=1
+        
+        [centos-ceph-nautilus-production]
+        name=Wocloud centos-ceph-nautilus
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/x86_64/7/centos-ceph-nautilus
+        gpgcheck=0
+        enabled=1
+        
+        EOF
+        ```
+        
+        ```shell
+        # aarch64架构服务器的yum源rep文件
+        cat > /etc/yum.repos.d/wocloud.repo << EOF
+        [base-production]
+        name=Wocloud Base
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/aarch64/7/base
+        gpgcheck=0
+        enabled=1
+        
+        [updates-production]
+        name=Wocloud updates
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/aarch64/7/updates
+        gpgcheck=0
+        enabled=1
+        
+        [extras-production]
+        name=Wocloud extras
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/aarch64/7/extras
+        gpgcheck=0
+        enabled=1
+        
+        [centos-openstack-rocky-production]
+        name=Wocloud centos-openstack-rocky
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/noarch/7/centos-openstack-rocky
+        gpgcheck=0
+        enabled=1
+        
+        [centos-ceph-nautilus-production]
+        name=Wocloud centos-ceph-nautilus
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/aarch64/7/centos-ceph-nautilus
+        gpgcheck=0
+        enabled=1
+        
+        [centos-euler-production]
+        name=Wocloud euler
+        baseurl=http://xx.xx.xx.xx:38888/production/centos/aarch64/7/openEuler
+        gpgcheck=0
+        enabled=1
+        
+        EOF
+        ```
+        ### 5.3 更新yum缓存
+        
+        ```shell
+        yum clean all
+        yum makecache
+        ```
+        
+        ## 6. 安装依赖
+        
+        **在部署节点执行：**
+        
+        ```shell
+        yum install vim ansible telnet tcpdump git expect  python-oslo-utils -y
+        ```
+        
+        ## 7. 做ssh互信
+        
+        **在部署节点执行：**
+        
+        ### 7.1 生成密钥对
+        
+        执行如下命令并一路回车
+        
+        ```shell
+        ssh-keygen
+        ```
+        
+        ### 7.2 生成主机IP地址文件
+        示例：
+        
+        ```shell
+        cd /opt/sunshine-ansible/tools/
+        > auto_ssh_host_ip
+        for i in 173.30.5.{1..40};do echo $i >> auto_ssh_host_ip;done
+        ```
+        
+        ### 7.3 更改密码并执行脚本
+        *将auto_ssh.exp脚本内123123替换为真实密码*
+        
+        ```shell
+        # 替换脚本内123123字符串
+        vim auto_ssh.exp
+        ```
+        
+        ```shell
+        ## 执行脚本
+        ./auto_ssh.exp
+        ```
+        
+        ### 7.4 部署节点与ceph monitor做互信
+        
+        ```shell
+        ssh-copy-id root@x.x.x.x
+        ```
+        
+        ## 8. 安装sunshine-ansible
+        
+        **在部署节点执行：**
+        
+        ### 8.1 拷贝sunshine-ansible
+        
+        将最新sunshine-ansible代码拷贝至/opt目录下
+        
+        ```shell
+        scp sunshine-ansible root@xx.xx.xx.xx:/opt/
+        ```
+        
+        ### 8.2 拷贝项目配置文件
+        
+        ```shell
+        cp -r /opt/sunshine-ansible/etc/sunshine/ /etc/
+        ```
+        
+        ### 8.3 生成随机密码
+        
+        ```shell
+        cd /opt/sunshine-ansible/tools/
+        ./generate_passwords.py
+        ```
+        
+        ### 8.4 配置inventory文件
+        
+        **注** ：
+        
+        * availability_zone 需要设置为az0x.cell0x.cn-xx-xx的格式，即az名称.cell名称.资源池名称
+        
+        ```shell
+        vim /opt/sunshine-ansible/ansible/inventory/multinode
+        # 三台控制节点主机信息，按照部署规划表替换相关信息
+        [control]
+        rgcc0001.cn-rockydev-1 ansible_host=173.20.5.35 availability_zone=az01.cell01.cn-rockydev-1
+        rgcc0002.cn-rockydev-1 ansible_host=173.20.5.36 availability_zone=az01.cell01.cn-rockydev-1
+        rgcc0003.cn-rockydev-1 ansible_host=173.20.5.37 availability_zone=az01.cell01.cn-rockydev-1
+        
+        # 网络节点信息，与控制节点保持一致
+        [network]
+        rgcc0001.cn-rockydev-1 ansible_host=173.20.5.35 availability_zone=az01.cell01.cn-rockydev-1
+        rgcc0002.cn-rockydev-1 ansible_host=173.20.5.36 availability_zone=az01.cell01.cn-rockydev-1
+        rgcc0003.cn-rockydev-1 ansible_host=173.20.5.37 availability_zone=az01.cell01.cn-rockydev-1
+        
+        # cinder-volume服务节点信息，分下面两种情况，根据资源池情况，选择一种填写。
+        # 1) 如果一个cell下只部署一个AZ，将三台cell节点信息填写到这个主机组
+        [storage]
+        cell01-1.cn-rockydev-1 ansible_host=172.20.33.61 availability_zone=az01.cell01.cn-rockydev-1
+        cell01-2.cn-rockydev-1 ansible_host=172.20.33.78 availability_zone=az01.cell01.cn-rockydev-1
+        cell01-3.cn-rockydev-1 ansible_host=172.20.33.82 availability_zone=az01.cell01.cn-rockydev-1
+        # 2） 如果一个cell下部署多个AZ，将每个AZ的计算节点的前三台填写到这个主机组，主机顺序请按AZ顺序填写
+        [storage]
+        ecm0001.az01cell01.cn-rockydev-1 ansible_host=173.20.5.38 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0002.az01cell01.cn-rockydev-1 ansible_host=173.20.5.39 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0003.az01cell01.cn-rockydev-1 ansible_host=173.20.5.40 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0001.az02cell01.cn-rockydev-1 ansible_host=173.20.5.41 availability_zone=az02.cell01.cn-rockydev-1
+        ecm0002.az02cell01.cn-rockydev-1 ansible_host=173.20.5.42 availability_zone=az02.cell01.cn-rockydev-1
+        ecm0003.az02cell01.cn-rockydev-1 ansible_host=173.20.5.43 availability_zone=az02.cell01.cn-rockydev-1
+        
+        # Cell1 集群信息
+        [cell-control-cell1]
+        clcc0001.cn-rockydev-1 ansible_host=173.20.5.24 availability_zone=az01.cell01.cn-rockydev-1
+        clcc0002.cn-rockydev-1 ansible_host=173.20.5.25 availability_zone=az01.cell01.cn-rockydev-1
+        clcc0003.cn-rockydev-1 ansible_host=173.20.5.26 availability_zone=az01.cell01.cn-rockydev-1
+        
+        [compute-cell1]
+        ecm0001.a.cn-rockydev-1 ansible_host=173.20.5.27 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0002.a.cn-rockydev-1 ansible_host=173.20.5.28 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0003.a.cn-rockydev-1 ansible_host=173.20.5.29 availability_zone=az01.cell01.cn-rockydev-1
+        ecm0001.b.cn-rockydev-1 ansible_host=173.20.5.30 availability_zone=az02.cell01.cn-rockydev-1
+        ecm0002.b.cn-rockydev-1 ansible_host=173.20.5.31 availability_zone=az02.cell01.cn-rockydev-1
+        ecm0003.b.cn-rockydev-1 ansible_host=173.20.5.32 availability_zone=az02.cell01.cn-rockydev-1
+        #GPU节点信息，添加独有的配置gpu_server_type和vgpu_type，具体配置参考GPU服务器参数文档
+        ecm0004.b.cn-rockydev-1 ansible_host=173.20.5.41 availability_zone=az02.cell01.cn-rockydev-1 gpu_server_type=vgpu vgpu_type=v100-16C
+        ecm0005.b.cn-rockydev-1 ansible_host=173.20.5.42 availability_zone=az02.cell01.cn-rockydev-1 gpu_server_type=vgpu vgpu_type=v100-16C
+        ecm0006.b.cn-rockydev-1 ansible_host=173.20.5.43 availability_zone=az02.cell01.cn-rockydev-1 gpu_server_type=vgpu vgpu_type=v100-16C
+        
+        [cell1:children]
+        cell-control-cell1
+        compute-cell1
+        
+        # Cell2集群信息
+        [cell-control-cell2]
+        clcc0004.cn-rockydev-1 ansible_host=173.20.5.36 availability_zone=az03.cell02.cn-rockydev-1
+        clcc0005.cn-rockydev-1 ansible_host=173.20.5.37 availability_zone=az03.cell02.cn-rockydev-1
+        clcc0006.cn-rockydev-1 ansible_host=173.20.5.38 availability_zone=az03.cell02.cn-rockydev-1
+        
+        [compute-cell2]
+        ecm0001.c.cn-rockydev-1 ansible_host=173.20.5.39 availability_zone=az03.cell02.cn-rockydev-1
+        ecm0002.c.cn-rockydev-1 ansible_host=173.20.5.40 availability_zone=az03.cell02.cn-rockydev-1
+        ecm0003.c.cn-rockydev-1 ansible_host=173.20.5.41 availability_zone=az03.cell02.cn-rockydev-1
+        
+        [cell2:children]
+        cell-control-cell2
+        compute-cell2
+        
+        #裸金属节点信息，三台单独节点，如果不需要部署裸金属，请将组名保留，下面的主机信息可以不填写
+        [baremetal]
+        
+        #ironic-inspector-dnsmasq服务节点信息，选择[baremetal]组的第一台即可，如果不需要部署裸金属，请将组名保留，下面的主机信息可以不填写
+        [ironic-inspector-dnsmasq]
+        
+        #裸金属compute节点信息，与[baremetal]保持一致，如果不需要部署裸金属，请将组名保留，下面的主机信息可以不填写
+        [compute-cell1-ironic]
+        
+        
+        # 填写所有cell集群的control主机组
+        [nova-conductor:children]
+        cell-control-cell1
+        cell-control-cell2
+        
+        # 填写所有cell集群的compute主机组
+        [nova-compute:children]
+        compute-added
+        compute-cell1
+        compute-cell2
+        
+        # 下面的主机组信息不需变动，保留即可
+        [compute-added]
+        
+        [chrony-server:children]
+        control
+        
+        [pacemaker:children]
+        control
+        ......
+        ......
+        ```
+        
+        ### 8.5 配置全局变量
+        **注: 文档中提到的有注释配置项需要更改，其他参数不需要更改**
+        
+        ```shell
+        vim /etc/sunshine/globals.yml
+        ########################
+        # Network & Base options
+        ########################
+        network_interface: "eth0" #管理网络的网卡名称
+        neutron_external_interface: "eth1" #业务网络的网卡名称
+        cidr_netmask: 24 #管理网的掩码
+        sunshine_vip_address: 173.20.5.33  #控制节点虚拟IP地址
+        cell1_vip_address: 173.20.5.34 #cell1集群的虚拟IP地址
+        cell2_vip_address: 173.20.5.35 #cell2集群的虚拟IP地址
+        external_fqdn: "" #用于vnc访问虚拟机的外网域名地址，如果有就填写，没有则不用修改
+        external_ntp_servers: [] #外部ntp服务器地址，如果需要使用该省分指定的时间服务器，则需要填写，否则不需填写
+        yumrepo_host: 172.20.3.243 #yum源的IP地址
+        yumrepo_port: 38888 #yum源端口号
+        enviroment: test  #yum源的类型，部署线上环境请更改为production
+        upgrade_all_packages: "yes" #是否升级所有安装版的版本(执行yum upgrade)，初始部署资源请设置为"yes"
+        enable_miner: "no" #是否开启部署miner服务
+        
+        ########################
+        # Available zone options
+        ########################
+        az_cephmon_compose:
+          - availability_zone: az01.cell01.cn-rockydev-1 #availability zone的名称，该名称必须与multinode主机文件内的az01的"availability_zone"值保持一致
+            ceph_mon_host: 172.20.90.2 #az01对应的一台ceph monitor主机地址，部署节点需要与该主机做ssh互信
+          - availability_zone: az02.cell01.cn-rockydev-1 #availability zone的名称，该名称必须与multinode主机文件内的az02的"availability_zone"值保持一致
+            ceph_mon_host: 172.31.2.30 #az02对应的一台ceph monitor主机地址，部署节点需要与该主机做ssh互信
+          - availability_zone: az03.cell02.cn-rockydev-1 #availability zone的名称，该名称必须与multinode主机文件内的az03的"availability_zone"值保持一致
+            ceph_mon_host: 172.20.90.2 #az03对应的一台ceph monitor主机地址，部署节点需要与该主机做ssh互信
+        
+        #######################
+        # Nova options
+        #######################
+        nova_reserved_host_memory_mb: 2048 #计算节点给计算服务预留的内存大小，线上资源池预留512G的内存预留32G，转换为mb，即填写32768；测试环境根据实际情况填写
+        enable_cells: "yes" #cell节点是否单独节点部署
+        support_gpu: "True" #cell节点是否有GPU服务器，如果有则为True，否则为False
+        
+        #######################
+        # Neutron options
+        #######################
+        monitor_ip:
+            - 172.20.2.9   #配置监控节点
+            - 172.20.2.10
+        enable_meter_full_eip: True   #配置是否允许全量监控，默认为True
+        
+        neutron_provider_networks:
+          network_types: "vlan"
+          network_vlan_ranges: "default:102:199"  #部署之前规划的业务网络vlan范围
+          network_mappings: "default:br-provider"
+          network_interface: "{{ neutron_external_interface }}"
+        
+        #######################
+        # Trove options
+        #######################
+        enable_trove: "no" #安装trove 需要改为yes
+        #default network
+        trove_default_neutron_networks:  #trove 的管理网络id `openstack network list|grep -w trove-mgmt|awk '{print$2}'`
+        #s3 setup
+        s3_endpoint_host_ip:   #s3的ip
+        s3_endpoint_host_name: #s3的域名
+        s3_endpoint_url:       #s3的url ·一般为http：//s3域名
+        s3_access_key:         #s3的ak 
+        s3_secret_key:         #s3的sk
+        
+        #######################
+        # Ironic options
+        #######################
+        enable_ironic: "no" #是否开机裸金属部署，默认不开启
+        ironic_neutron_provisioning_network_uuid:
+        ironic_neutron_cleaning_network_uuid: "{{ ironic_neutron_provisioning_network_uuid }}"
+        ironic_dnsmasq_interface:
+        ironic_dnsmasq_dhcp_range:
+        ironic_tftp_server_address: "{{ hostvars[inventory_hostname]['ansible_' + ironic_dnsmasq_interface]['ipv4']['address'] }}"
+        # 交换机设备相关信息
+        neutron_ml2_conf_genericswitch:
+          genericswitch:xxxxxxx:
+            device_type:
+            ngs_mac_address:
+            ip:
+            username:
+            password:
+            ngs_port_default_vlan:
+        
+        # Package state setting
+        haproxy_package_state: "present"
+        mariadb_package_state: "present"
+        rabbitmq_package_state: "present"
+        memcached_package_state: "present"
+        ceph_client_package_state: "present"
+        keystone_package_state: "present"
+        glance_package_state: "present"
+        cinder_package_state: "present"
+        nova_package_state: "present"
+        neutron_package_state: "present"
+        miner_package_state: "present"
+        ```
+        
+        6. 检查所有节点ssh连接状态
+        ```shell
+        ansible all -i /opt/sunshine-ansible/ansible/inventory/multinode -m ping
+        
+        # 执行结果显示每台主机都是"SUCCESS"即说明连接状态没问题,示例：
+        ecm0001.b.cn-rockydev-1 | SUCCESS => {
+          "ansible_facts": {
+              "discovered_interpreter_python": "/usr/bin/python"
+          },
+          "changed": false,
+          "ping": "pong"
+        }
+        ```
+        
+        ## 9. 执行部署
+        
+        **在部署节点执行：**
+        
+        ### 9.1 执行bootstrap
+        
+        ```shell
+        # 执行部署
+        cd /opt/sunshine-ansible/tools
+        bash sunshine-ansible -i ../ansible/inventory/multinode bootstrap --forks 50
+        ```
+        ### 9.2 重启所有服务器
+        **注：执行重启的原因是:bootstrap可能会升内核,更改selinux配置或者有GPU服务器,如果装机过程已经是新版内核,selinux disable或者没有GPU服务器,则不需要执行该步骤**
+        
+        ```shell
+        # 重启所有计算节点
+        ansible compute -i /opt/sunshine-ansible/ansible/inventory/multinode -m shell -a "init 6"
+        # 手动重启三台控制节点,执行命令
+        init6
+        # 重启完成后，再次检查连通性
+        cd /opt/sunshine-ansible/tools/
+        ansible all -i /opt/sunshine-ansible/ansible/inventory/multinode -m ping
+        # 重启完后操作系统后，再次启动yum源
+        cd /opt/repo/
+        python -m SimpleHTTPServer 38888 > /dev/null 2>&1  &
+        ```
+        ### 9.3 执行部署前检查
+        
+        ```shell
+        cd /opt/sunshine-ansible/tools/
+        bash sunshine-ansible -i ../ansible/inventory/multinode prechecks --forks 50
+        ```
+        ### 9.4 执行部署
+        
+        ```shell
+        cd /opt/sunshine-ansible/tools/
+        bash sunshine-ansible -i ../ansible/inventory/multinode deploy --forks 50
+        ```
+        
+        ## 10. 初始化
+        
+        ### 10.1 创建镜像
+        执行命令之前请确保镜像文件已经传输到本地，上传之前确认下镜像格式必须为raw格式
+        
+        ```shell
+        glance image-create --name CENT_7.4_S_64_X_20_X_v5.0 --progress --disk-format raw --container-format bare --property hw_qemu_guest_agent=yes  --property os_type=linux --property  telegraf_config_path='/etc/telegraf/telegraf.conf' --file CENT_7.4_S_64_X_20_X_v5.0.raw
+        ```
+        ```shell
+        glance image-create --name UBUNTU_16.04_S_64_X_50_v3.0 --progress --disk-format qcow2 --container-format bare --property hw_qemu_guest_agent=yes  --property os_type=linux --property  telegraf_config_path='/etc/telegraf/telegraf.conf' --file UBUNTU_16.04_S_64_X_50_v3.0.qcow2
+        ```
+        
+        **注** ！对于aarch64架构的镜像，执行创建镜像命令需要添加额外的`property`参数：`hw_architecture=aarch64`和`hw_scsi_model=virtio-scsi`：
+        
+        ```shell
+        # 将`IMAGE_NAME_OF_LINUX_BASE_ON_AARCH64`改成要创建的镜像名，将`IMAGE_FILE_NAME_OF_LINUX_BASH_ON_AARCH64`改成上传到本地的镜像文件名。
+        glance image-create --name 'IMAGE_NAME_OF_LINUX_BASE_ON_AARCH64' --progress --disk-format raw --container-format bare --property hw_architecture=aarch64 --property hw_scsi_model=virtio-scsi --property hw_qemu_guest_agent=yes  --property os_type=linux --property  telegraf_config_path='/etc/telegraf/telegraf.conf' --file IMAGE_FILE_NAME_OF_LINUX_BASH_ON_AARCH64.raw
+        ```
+        
+        
+        
+        ### 10.2 更改admin租户的uuid
+        
+        **注**：私有云资源池需要修改admin租户的uuid，上层对接四大平台的资源池则不需要。
+        
+        更改后的id应为: 0461f1ac9fcb4fc1a35edb0cf5c9c39a
+        具体更改方法因篇幅长度原因，这里提供一下更改思路：
+        
+         >创建一个新的project admin1，然后在数据库把新的project admin1 ID改为0461f1ac9fcb4fc1a35edb0cf5c9c39a，然后用openstack命令行将这个新的project admin1与admin user、admin role绑定，然后生成新的admin1rc文件，确认权限没问题后，openstack命令删除旧的admin project，最后用openstack命令把新的project name改为admin
+        
+        ## 11. 部署miner
+        
+        **注**：私有云资源池需要部署miner，上层对接四大平台的资源池则不需要部署miner。
+        
+        ### 11.1 打开miner开关
+        
+        ```shell
+        ## 将enable_miner设置为yes
+        vim /etc/sunshine/globals.yml
+        enable_miner: yes
+        ```
+        ### 11.2 部署miner
+        
+        ```shell
+        cd /opt/sunshine-ansible/tools
+        bash sunshine-ansible -i ../ansible/inventory/multinode deploy -t haproxy,miner
+        ```
+        
+        ### 11.2 卸载miner的方法
+        
+        对接四大平台的资源池的情况下，如果测试阶段需要miner服务，测试完成后需要将miner卸载。
+        
+        这里提供卸载miner服务的方法,在三台控制节点执行：
+        
+        ```shell
+        systemctl stop miner-api.service miner-patrol.service miner-sentry.service
+        systemctl disable miner-api.service miner-patrol.service miner-sentry.service
+        yum remove miner python-miner -y
+        ```
+        
+        
+        
+        ## 12. 部署ironic
+        
+        ### 12.1 创建网络子接口
+        
+        **该步骤只在ironic-inspector-dnsmasq节点执行 **
+        
+        ```shell
+        cat << EOF > /etc/sysconfig/network-scripts/ifcfg-eth1.2779
+        VLAN=yes
+        TYPE=Vlan
+        PHYSDEV=eth1
+        VLAN_ID=2799
+        REORDER_HDR=yes
+        GVRP=no
+        MVRP=no
+        PROXY_METHOD=none
+        BROWSER_ONLY=no
+        BOOTPROTO=none
+        IPADDR=40.40.50.250
+        PREFIX=24
+        DEFROUTE=yes
+        IPV4_FAILURE_FATAL=no
+        IPV6INIT=yes
+        IPV6_AUTOCONF=yes
+        IPV6_DEFROUTE=yes
+        IPV6_FAILURE_FATAL=no
+        IPV6_ADDR_GEN_MODE=stable-privacy
+        NAME=eth1.2799
+        UUID=3faea8e1-6130-4037-9801-8450de2b31a5
+        DEVICE=eth1.2799
+        ONBOOT=yes
+        EOF
+        ```
+        
+        ### 12.2 创建虚拟网络
+        
+        **该步骤可以在任意一台控制节点执行 **
+        
+        ```shell
+        # 创建网路：provision（provision网络和clean使用同一个就行）。命令可参考：
+        neutron net-create --provider:network_type vlan --provider:physical_network default --provider:segmentation_id {{ vlan_tag }} ironic_provisioning_net
+        neutron subnet-create ironic_provisioning_net 10.0.1.0/24 --name ironic_provision_subnet --disable-dhcp
+        ```
+        
+        ### 12.3 更改主机组文件
+        
+        **在部署节点执行 **
+        
+        ```shell
+        vim /opt/sunshine-ansible/ansible/inventory/multinode
+        #裸金属节点信息，三台单独节点，如果不需要部署裸金属
+        [baremetal]
+        ironic0001.cn-rockydev-1 ansible_host=173.20.5.42 availability_zone=ironic01.cn-rockydev-1
+        ironic0002.cn-rockydev-1 ansible_host=173.20.5.43 availability_zone=ironic01.cn-rockydev-1
+        ironic0003.cn-rockydev-1 ansible_host=173.20.5.44 availability_zone=ironic01.cn-rockydev-1
+        
+        #ironic-inspector-dnsmasq服务节点信息，选择[baremetal]组的第一台即可
+        [ironic-inspector-dnsmasq]
+        ironic0001.cn-rockydev-1 ansible_host=173.20.5.42 availability_zone=ironic01.cn-rockydev-1
+        
+        #裸金属compute节点信息，与[baremetal]保持一致
+        [compute-cell1-ironic]
+        ironic0001.cn-rockydev-1 ansible_host=173.20.5.42 availability_zone=ironic01.cn-rockydev-1
+        ironic0002.cn-rockydev-1 ansible_host=173.20.5.43 availability_zone=ironic01.cn-rockydev-1
+        ironic0003.cn-rockydev-1 ansible_host=173.20.5.44 availability_zone=ironic01.cn-rockydev-1
+        ```
+        
+        ### 12.4 更改全局变量文件
+        
+        **在部署节点执行 **
+        
+        ```shell
+        vim /etc/sunshine/globals.yml
+        #######################
+        # Ironic options
+        #######################
+        enable_ironic: "yes"
+        ironic_neutron_provisioning_network_uuid: # 12.2步骤创建的
+        ironic_neutron_cleaning_network_uuid: "{{ ironic_neutron_provisioning_network_uuid }}"
+        ironic_dnsmasq_interface:
+        ironic_dnsmasq_dhcp_range:
+        ironic_tftp_server_address:
+        # 交换机设备相关信息
+        neutron_ml2_conf_genericswitch:
+          genericswitch:xxxxxxx:
+            device_type:
+            ngs_mac_address:
+            ip:
+            username:
+            password:
+            ngs_port_default_vlan:
+        ```
+        
+        ### 12.5 执行部署
+        
+        **在部署节点执行 **
+        
+        ```shell
+        bash sunshine-ansible -i ../ansible/inventory/multinode bootstrap --forks 50 --limit baremetal
+        
+        bash sunshine-ansible -i ../ansible/inventory/multinode deploy --forks 50 -t haproxy,ironic
+        ```
+        
+        ### 12.6 上传镜像到tftp目录
+        
+        **该步骤只在ironic-inspector-dnsmasq节点执行 **
+        
+        ```shell
+        # 拷贝镜像文件
+        # x86_64架构
+        cp ironic-agent-x86.kernel ironic-agent-x86.initramfs pxelinux.0 /tftpboot
+        # arm架构
+        cp ironic-agent-aarch64.kernel ironic-agent-aarch64.initramfs pxelinux.0 /tftpboot
+        # 重启服务
+        systemctl restart openstack-ironic-inspector-dnsmasq
+        ```
+        
+        ### 12.7 上传镜像到glance
+        
+        ```shell
+        # x86_64架构
+        glance image-create --name ironic-kernel-x86 --visibility public --disk-format aki --container-format aki --file ironic-agent-x86.kernel
+        glance image-create --name ironic-initrd-x86 --visibility public --disk-format aki --container-format aki --file ironic-agent-x86.initramfs
+        # arm架构
+        glance image-create --name ironic-kernel-aarch64 --visibility public --disk-format aki --container-format aki --file ironic-agent-aarch64.kernel
+        glance image-create --name ironic-initrd-aarch64 --visibility public --disk-format aki --container-format aki --file ironic-agent-aarch64.initramfs
+        
+        ```
+        
+        ### 12.8 验证
+        
+        ```shell
+        source ~/openrc
+        ironic node-list
+        ```
+        
+        ### 12.9 ironic纳管物理机的要求以及基本信息
+        
+        **物理机及交换机要求**
+        
+        如果需要ironic对物理机进行纳管，物理机需要满足一下几个条件：
+        1. 物理服务器一定要开启IPMI；
+        2. 物理服务器的IPMI网络和环境的管理网需要连通；
+        3. 物理服务器必须支持vnc server，并确保开启；
+        4. 物理服务器所有的网卡必须开启pxe功能；
+        5. 物理服务器的网络要和环境的租户网络通；
+        6. 物理服务器网卡（所有）对应的交换机端口的VLAN要调整为提前规划好的VLAN。
+        
+        由于ironic在部署实例的过程当中需要操作交换机，所以对交换机也有要求：
+        1. 提供的通过ssh登陆交换机的IP所在的网络必须和环境的管理网连通；
+        2. 交换机要确保可以直接ssh登录，中间不能有弹出确认提示，e.g.如修改默认密码等提示；
+        3. 交换机必须在适配的列表中。注：具体的适配列表可咨询网络组的同事。
+        
+        **物理机及交换机信息 **
+        
+        物理服务器信息：
+        
+        | ipmi username | ipmi password | ipmi address | vnc address | vnc port | vnc password |
+        | --- | --- | --- | --- | --- | --- |
+        
+        交换机信息：
+        
+        | 交换机型号 | 交换机ip | 交换机用户名 | 交换机密码 | 交换机Mac地址 |
+        | --- | --- | --- | --- | --- |
+        
+        
+        ## 13. 部署完成后，针对GPU服务器的配置
+        
+        **在部署节点执行 **
+        
+        由于GPU节点部署好后，还需要对flavor和镜像做配置，才可使用GPU计算服务。
+        所以，如果扩容节点中有GPU节点，请完成如下修改：
+        
+        ### 13.1 flavor配置
+        
+        ```shell
+        # vGPU类型的实例
+        # vGPU类型的实例使用的flavor较普通类型的实例的有所不同。vGPU类型的实例使用的flavor需要添加一些额外的属性：
+        openstack flavor set $flavor_uuid --property "resources:VGPU=1" --property "aggregate_instance_extra_specs:vgpu=16_32_V100_C"
+        # 如果是不同的vGPU类型，只需要将`aggregate_instance_extra_specs:vgpu`的值更新为对应的类型的代号即可，`resources:VGPU=1`是不需要变更的。
+        # 普通类型的实例
+        #避免在有GPU的宿主机上创建普通类型（无vGPU）的实例，有必要再普通类型使用的flavor中添加一些额外的属性(`trait_name`使用默认值"CUSTOM_VGPU")：
+        openstack flavor set $flavor_uuid --property "trait:$trait_name=forbidden"
+        ```
+        ### 13.2 镜像设置
+        
+        ```shell
+        # GPU虚机使用的`Windows`镜像（只有`Windows`镜像）需要设置`hw_vfio_display_on`属性。具体方式如下：
+        glance image-update $image_uuid --property hw_vfio_display_on=true
+        
+        # 所有镜像都要设置trait属性:
+        openstack image set $image_uuid --property "trait:$trait_name=required"
+        # 不同镜像的'trait_name'不同,使用我们预定义的trait_name:CUSTOM_BAREMETAL, CUSTOM_VGPU, CUSTOM_NORMAL:
+        
+        # 普通虚拟机镜像设置属性:
+        openstack image set $normal_vm_image_uuid --property "trait:CUSTOM_NORMAL=required"
+        # vGPU虚拟机镜像设置属性:
+        openstack image set $gpu_vm_image_uuid --property "trait:CUSTOM_VGPU=required"
+        # 裸金属镜像设置属性:
+        openstack image set $baremetal_image_uuid --property "trait:CUSTOM_BAREMETAL=required"
+        
+        ```
+        
+        
+Platform: UNKNOWN
+Classifier: Environment :: OpenStack
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.5

@@ -17,8 +17,8 @@ Neutron API supports extensions to provide advanced network \
 capabilities (e.g., QoS, ACLs, network monitoring, etc.)
 
 Name:           openstack-%{service}
-Version:        13.0.6
-Release:        1wocloud%{?dist}
+Version:        13.5.8
+Release:        1woclouddevelop%{?dist}
 Epoch:          1
 Summary:        OpenStack Networking Service
 
@@ -304,6 +304,7 @@ networks using Open vSwitch.
 %package metering-agent
 Summary:        Neutron bandwidth metering agent
 Requires:       iptables
+Requires:       fping
 Requires:       openstack-%{service}-common = %{epoch}:%{version}-%{release}
 
 
@@ -629,6 +630,7 @@ fi
 %config(noreplace) %attr(0640, root, %{service}) %{_sysconfdir}/%{service}/l3_agent.ini
 %config(noreplace) %attr(0640, root, %{service}) %{_sysconfdir}/%{service}/metadata_agent.ini
 %config(noreplace) %attr(0640, root, %{service}) %{_sysconfdir}/%{service}/policy.json
+%config(noreplace) %attr(0640, root, %{service}) %{_sysconfdir}/%{service}/metering_agent.ini
 %dir %{_sysconfdir}/%{service}/conf.d/%{service}-dhcp-agent
 %dir %{_sysconfdir}/%{service}/conf.d/%{service}-l3-agent
 %dir %{_sysconfdir}/%{service}/conf.d/%{service}-metadata-agent
@@ -681,6 +683,7 @@ fi
 %{_datarootdir}/%{service}/rootwrap/l3.filters
 %{_datarootdir}/%{service}/rootwrap/netns-cleanup.filters
 %{_datarootdir}/%{service}/rootwrap/privsep.filters
+%{_datarootdir}/%{service}/rootwrap/metering.filters
 
 
 %files linuxbridge

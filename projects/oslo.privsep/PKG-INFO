@@ -1,0 +1,51 @@
+Metadata-Version: 1.1
+Name: oslo.privsep
+Version: 1.29.2
+Summary: OpenStack library for privilege separation
+Home-page: https://docs.openstack.org/oslo.privsep/latest/
+Author: OpenStack
+Author-email: openstack-dev@lists.openstack.org
+License: UNKNOWN
+Description-Content-Type: UNKNOWN
+Description: ========================
+        Team and repository tags
+        ========================
+        
+        .. image:: https://governance.openstack.org/tc/badges/oslo.privsep.svg
+            :target: https://governance.openstack.org/tc/reference/tags/index.html
+        
+        .. Change things from this point on
+        
+        ==========
+        oslo.privsep
+        ==========
+        
+        .. image:: https://img.shields.io/pypi/v/oslo.privsep.svg
+            :target: https://pypi.org/project/oslo.privsep/
+            :alt: Latest Version
+        
+        .. image:: https://img.shields.io/pypi/dm/oslo.privsep.svg
+            :target: https://pypi.org/project/oslo.privsep/
+            :alt: Downloads
+        
+        The oslo.privsep library provides support for common utility type functions,
+        such as encoding, exception handling, string manipulation, and time handling.
+        
+        * Free software: Apache license
+        * Documentation: https://docs.openstack.org/oslo.privsep/latest/
+        * Source: https://git.openstack.org/cgit/openstack/oslo.privsep
+        * Bugs: https://bugs.launchpad.net/oslo.privsep
+        * Release notes: https://docs.openstack.org/releasenotes/oslo.privsep/
+        
+        
+Platform: UNKNOWN
+Classifier: Environment :: OpenStack
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.5

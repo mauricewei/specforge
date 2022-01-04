@@ -10,8 +10,8 @@ Name:             openstack-%{service}
 # Liberty semver reset
 # https://review.openstack.org/#/q/I6a35fa0dda798fad93b804d00a46af80f08d475c,n,z
 Epoch:            1
-Version:          13.0.8
-Release:          1wocloud%{?dist}
+Version:          13.5.0
+Release:          1woclouddevelop%{?dist}
 Summary:          OpenStack Volume service
 
 License:          ASL 2.0

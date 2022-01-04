@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: python-novaclient
-Version: 11.0.1.dev22
+Version: 11.5.0
 Summary: Client library for OpenStack Compute API
 Home-page: https://docs.openstack.org/python-novaclient/latest
 Author: OpenStack

@@ -4,18 +4,18 @@
 
 Name:             miner
 Epoch:		  1
-Version:          1.0.1
-Release:          5wocloud%{?dist}
+Version:          1.1.0
+Release:          1wocloud6.0.0%{?dist}
 Summary:          OpenStack Resource Management System(%{project})
 
 License:          ASL 2.0
 URL:              https://www.chinacloud.com.cn
 Source0:          https://launchpad.net/%{project}/%{release_name}/%{version}/+download/%{project}-%{version}.tar.gz
 
-Source1:          %{project}-dist.conf
+#Source1:          %{project}-dist.conf
 Source2:          %{project}.logrotate
 Source3:          %{project}.cron
-Source4:          %{project}.sudoers
+#Source4:          %{project}.sudoers
 
 Source10:         %{name}-api.service
 Source11:         %{name}-beat.service

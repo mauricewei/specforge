@@ -10,8 +10,8 @@ Client library (cinderclient python module) and command line utility \
 (cinder) for interacting with OpenStack Cinder (Block Storage) API.
 
 Name:             python-cinderclient
-Version:          4.0.2
-Release:          1wocloud%{?dist}
+Version:          4.4.5
+Release:          1woclouddevelop%{?dist}
 Summary:          Python API and CLI for OpenStack Cinder
 
 License:          ASL 2.0

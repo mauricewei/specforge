@@ -17,8 +17,8 @@ Name:             openstack-nova
 # Liberty semver reset
 # https://review.openstack.org/#/q/I6a35fa0dda798fad93b804d00a46af80f08d475c,n,z
 Epoch:            1
-Version:          18.2.1
-Release:          6wocloud%{?dist}
+Version:          18.7.0
+Release:          1woclouddevelop%{?dist}
 Summary:          OpenStack Compute (nova)
 
 License:          ASL 2.0
@@ -384,7 +384,7 @@ Requires:         python-netifaces >= 0.10.4
 Requires:         python2-neutronclient >= 6.7.0
 Requires:         python2-novaclient >= 2.30.1
 Requires:         python2-os-brick >= 2.5.0
-Requires:         python2-os-traits
+Requires:         python2-os-traits >= 0.9.1
 Requires:         python2-oslo-cache >= 1.26.0
 Requires:         python2-oslo-concurrency >= 3.26.0
 Requires:         python2-oslo-config >= 2:6.1.0

@@ -14,8 +14,8 @@ glanceclient module), and a command-line script (glance). Each implements \
 
 Name:             python-glanceclient
 Epoch:            1
-Version:          2.13.1
-Release:          1wocloud%{?dist}
+Version:          2.14.0
+Release:          1wocloud6.0.0%{?dist}
 Summary:          Python API and CLI for OpenStack Glance
 
 License:          ASL 2.0

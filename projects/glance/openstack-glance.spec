@@ -21,8 +21,8 @@ Name:             openstack-glance
 # Liberty semver reset
 # https://review.openstack.org/#/q/I6a35fa0dda798fad93b804d00a46af80f08d475c,n,z
 Epoch:            1
-Version:          17.0.0
-Release:          3wocloud%{?dist}
+Version:          17.1.0
+Release:          1wocloud6.0.0%{?dist}
 Summary:          OpenStack Image Service
 
 License:          ASL 2.0

@@ -13,8 +13,8 @@ the OpenStack Nova API.
 
 Name:             python-novaclient
 Epoch:            1
-Version:          11.0.0
-Release:          6wocloud%{?dist}
+Version:          11.5.0
+Release:          1woclouddevelop%{?dist}
 Summary:          Python API and CLI for OpenStack Nova
 License:          ASL 2.0
 URL:              https://launchpad.net/%{name}

@@ -11,8 +11,8 @@ Client library and command line utility for interacting with OpenStack \
 Neutron's API.
 
 Name:       python-neutronclient
-Version:    6.9.1
-Release:    3wocloud%{?dist}
+Version:    6.13.1
+Release:    1woclouddevelop%{?dist}
 Summary:    Python API and CLI for OpenStack Neutron
 
 License:    ASL 2.0

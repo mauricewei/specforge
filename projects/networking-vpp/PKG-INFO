@@ -1,0 +1,45 @@
+Metadata-Version: 1.1
+Name: networking-vpp
+Version: 0.0.1.dev118
+Summary: OpenStack Networking for VPP
+Home-page: https://wiki.openstack.org/wiki/Networking-vpp
+Author: OpenStack
+Author-email: openstack-discuss@lists.openstack.org
+License: UNKNOWN
+Description-Content-Type: UNKNOWN
+Description: networking-vpp
+        ==============
+        
+        ML2 Mechanism driver and small control plane for the [VPP
+        forwarder](`What is VPP <https://wiki.fd.io/view/VPP/What_is_VPP%3F>`_)
+        
+        This is a Neutron mechanism driver to bring the advantages of VPP to
+        OpenStack deployments.
+        
+        It's been written to be as simple and readable as possible while
+        offering either full Neutron functionality or a simple roadmap to it.
+        While the driver is not perfect, we're aiming for
+        
+        - robustness in the face of failures (of one of several Neutron
+          servers, of agents, of the etcd nodes in the cluster gluing them
+          together)
+        - simplicity
+        - testability - having failure cases covered is no good if you don't
+          have a means to test the code that protects you from them
+        
+        As a general rule, everything is implemented in the simplest way, for
+        three reasons: we get to see it working faster, we can test it, and
+        anyone that wants to join the project can make sense of it.
+        
+        
+Platform: UNKNOWN
+Classifier: Environment :: OpenStack
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.5
